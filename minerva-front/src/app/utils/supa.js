@@ -84,7 +84,7 @@ export async function getPermisosUsuarios() {
 export async function setPermisoUsuario(userId, permiso) {
     const { data, error } = await supaClient
         .from("permisos_usuarios")
-        .upsert({ id_usuario: userId, permiso }, { onConflict: "permiso" })
+        .upsert({ id_usuario: userId, permiso }, { onConflict: "id_usuario, permiso" })
         .select()
     return { data, error }
 }
@@ -407,6 +407,181 @@ export async function getTaskProgresos(taskId) {
         .eq("id_task", taskId)
         .order("created_at", { ascending: false })
     return { progresos: data ?? [], error }
+}
+
+/**
+ * Fetches all non-deleted eventos, ordered by inicio (ascending).
+ */
+export async function getEventos() {
+    const { data, error } = await supaClient
+        .from("eventos")
+        .select("*")
+        .eq("deleted", false)
+        .order("inicio", { ascending: true })
+    return { eventos: data ?? [], error }
+}
+
+/**
+ * Creates a new evento and initializes attendees.
+ * @param {object} eventoData 
+ * @param {string[]} userIds 
+ */
+export async function createEvento(eventoData, userIds = []) {
+    const { data: evento, error: eventoError } = await supaClient
+        .from("eventos")
+        .insert(eventoData)
+        .select()
+        .single()
+    
+    if (eventoError || !evento) return { evento: null, error: eventoError }
+
+    if (userIds.length > 0) {
+        const rows = userIds.map(uid => ({
+            id_evento: evento.id_evento,
+            id_usuario: uid,
+            asistencia: 0
+        }))
+        const { error: asisError } = await supaClient
+            .from("eventos_usuarios")
+            .insert(rows)
+        if (asisError) console.error("Error creating attendance rows", asisError)
+    }
+
+    return { evento, error: null }
+}
+
+/**
+ * Updates an evento.
+ * @param {string} id_evento 
+ * @param {object} eventoData 
+ * @param {string[]} userIds 
+ */
+export async function updateEvento(id_evento, eventoData, userIds = []) {
+    const { data: evento, error: eventoError } = await supaClient
+        .from("eventos")
+        .update(eventoData)
+        .eq("id_evento", id_evento)
+        .select()
+        .single()
+    
+    if (eventoError) return { evento: null, error: eventoError }
+
+    // Sync users
+    const { data: existing } = await supaClient
+        .from("eventos_usuarios")
+        .select("id_usuario")
+        .eq("id_evento", id_evento)
+
+    const existingIds = existing ? existing.map(e => e.id_usuario) : []
+    const toAdd = userIds.filter(uid => !existingIds.includes(uid))
+    const toRemove = existingIds.filter(uid => !userIds.includes(uid))
+
+    if (toAdd.length > 0) {
+        const rows = toAdd.map(uid => ({
+            id_evento,
+            id_usuario: uid,
+            asistencia: 0
+        }))
+        await supaClient.from("eventos_usuarios").insert(rows)
+    }
+
+    if (toRemove.length > 0) {
+        await supaClient.from("eventos_usuarios")
+            .delete()
+            .eq("id_evento", id_evento)
+            .in("id_usuario", toRemove)
+    }
+
+    return { evento, error: null }
+}
+
+/**
+ * Soft deletes an evento.
+ * @param {string} id_evento 
+ * @param {string} userId 
+ */
+export async function deleteEvento(id_evento, userId) {
+    const { error } = await supaClient
+        .from("eventos")
+        .update({ deleted: true, deleted_by: userId })
+        .eq("id_evento", id_evento)
+    return { error }
+}
+
+/**
+ * Fetches users assigned to an evento grouped by their attendance status.
+ * @param {string} id_evento 
+ */
+export async function getEventUsers(id_evento) {
+    const { data, error } = await supaClient
+        .from("eventos_usuarios")
+        .select("asistencia, profiles(*)")
+        .eq("id_evento", id_evento)
+
+    if (error) return { data: null, error }
+
+    // Supabase returns profiles as an object or array. Usually object because it's a many-to-one mapping
+    const confirmados = data.filter(d => d.asistencia === 1).map(d => d.profiles)
+    const justificados = data.filter(d => d.asistencia === 2).map(d => d.profiles)
+    const nr = data.filter(d => d.asistencia === 0).map(d => d.profiles)
+
+    return { 
+        data: { confirmados, justificados, nr }, 
+        error: null 
+    }
+}
+
+/**
+ * Confirm user's attendance for an event.
+ * @param {string} id_evento 
+ * @param {string} id_usuario 
+ */
+export async function confirmarAsistencia(id_evento, id_usuario) {
+    const { error } = await supaClient
+        .from("eventos_usuarios")
+        .update({ asistencia: 1 })
+        .eq("id_evento", id_evento)
+        .eq("id_usuario", id_usuario)
+    return { error }
+}
+
+/**
+ * Submit justification for absence. Upload files to storage and update db.
+ * @param {string} id_evento 
+ * @param {string} id_usuario 
+ * @param {string} motivo 
+ * @param {File[]} archivos 
+ */
+export async function enviarJustificacion(id_evento, id_usuario, motivo, archivos = []) {
+    const uploadedUrls = []
+
+    for (const file of archivos) {
+        const fileExt = file.name.split(".").pop()
+        const fileName = `${id_evento}/${id_usuario}-${Math.random()}.${fileExt}`
+        
+        const { error: uploadError } = await supaClient.storage
+            .from("justificaciones")
+            .upload(fileName, file)
+        
+        if (!uploadError) {
+            const { data: { publicUrl } } = supaClient.storage
+                .from("justificaciones")
+                .getPublicUrl(fileName)
+            uploadedUrls.push(publicUrl)
+        }
+    }
+
+    const { error } = await supaClient
+        .from("eventos_usuarios")
+        .update({ 
+            asistencia: 2, 
+            motivo_justificacion: motivo,
+            archivos: uploadedUrls
+        })
+        .eq("id_evento", id_evento)
+        .eq("id_usuario", id_usuario)
+        
+    return { error }
 }
 
 export { supaClient }

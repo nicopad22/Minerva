@@ -1,7 +1,7 @@
 "use client"
 import { Autocomplete, Button, Chip, CircularProgress, FormControlLabel, TextField, Typography, styled } from "@mui/material";
 import { useEffect, useState } from "react";
-import Perfil from "@/app/utils/perfil";
+import { createClient } from "@/app/utils/client";
 import { DesktopDateTimePicker } from "@mui/x-date-pickers";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -73,7 +73,8 @@ export default function FormEvento({ evento, handleClose, onSuccess }) {
 
     const handleSubmit = async () => {
         setIsLoading(true)
-        const userProfileId = Perfil()?.getToken()?.id_usuario;
+        const { data: { session } } = await createClient().auth.getSession()
+        const userProfileId = session?.user?.id;
 
         const eventoData = {
             titulo: title,

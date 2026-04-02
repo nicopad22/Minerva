@@ -5,6 +5,7 @@ import { MdAdd, MdLock, MdLogout, MdPerson, MdEmail, MdGroup, MdVisibility, MdVi
 import Perfil from "../utils/perfil"
 import { getProfileById, uploadAvatar as uploadAvatarSupa, getUserTeam } from "../utils/supa"
 import { changePassword } from "../utils/supaAuth"
+import { createClient } from "../utils/client"
 
 export default function UserProfilePopup({ onSignOut }) {
     const [open, setOpen] = useState(false)
@@ -25,14 +26,19 @@ export default function UserProfilePopup({ onSignOut }) {
     const triggerRef = useRef(null)
     const fileInputRef = useRef(null)
 
-    const { id_usuario } = Perfil().getToken()
+    const [id_usuario, setIdUsuario] = useState(null)
     const userName = Perfil().getName() || "Usuario"
 
-    // Fetch profile + team when popup opens
+    // Fetch id_usuario from native Supabase session
     useEffect(() => {
-        if (id_usuario) {
-            fetchData()
-        }
+        createClient().auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.id) setIdUsuario(session.user.id)
+        })
+    }, [])
+
+    // Fetch profile + team once we have id_usuario
+    useEffect(() => {
+        if (id_usuario) fetchData()
     }, [id_usuario])
 
     async function fetchData() {

@@ -10,8 +10,8 @@ import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import { useEffect, useState } from 'react';
 import { Box, Button, Card, CardContent, Modal, Typography } from '@mui/material';
 import FormInasistencia from './FormInasistencia';
-import Perfil from '../utils/perfil';
-import { confirmarAsistencia, getEventos, getEventUsers } from '../utils/supa';
+import { createClient } from '../utils/client';
+import { confirmarAsistencia, getEventos } from '../utils/supa';
 import dayjs from 'dayjs';
 
 const style = {
@@ -42,9 +42,16 @@ export default function CalendarView() {
     const [openM, setOpenM] = useState(false)
     const [events, setEvents] = useState([])
     const [loading, setLoading] = useState(false)
+    const [userId, setUserId] = useState(null)
+
+    useEffect(() => {
+        createClient().auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.id) setUserId(session.user.id)
+        })
+    }, [])
 
     const fetchEvents = async () => {
-        const userProfileId = Perfil()?.getToken()?.id_usuario;
+        const userProfileId = userId;
 
         const { eventos, error } = await getEventos();
         if (error || !eventos) {
@@ -53,28 +60,16 @@ export default function CalendarView() {
             return;
         }
 
-        // Para saber la asistencia actual del usuario que ve el calendario
-        // tenemos que buscar en eventos_usuarios o traer todos y filtrar.
-        // Haremos un fetching optimizado o uno a uno (uno a uno puede ser lento si hay miles,
-        // pero por ahora para replicar logica iteramos)
-
-        const mappedEvents = []
-        for (const ev of eventos) {
+        // Attendance is embedded in each event by the joined query — no extra requests needed.
+        const mappedEvents = eventos.map(ev => {
             const hInicio = dayjs(ev.inicio).format('HH:mm');
-            let hFinal = ev.final ? dayjs(ev.final).format('HH:mm') : '';
+            const hFinal = ev.final ? dayjs(ev.final).format('HH:mm') : '';
             const horaD = ev.final ? `${hInicio} - ${hFinal}` : hInicio;
 
-            // Find my attendance
-            const { data: usersData } = await getEventUsers(ev.id_evento);
-            let myAsistencia = 0; // nr
-            if (usersData) {
-                const isConfirmado = usersData.confirmados.find(u => u.id === userProfileId);
-                const isJustificado = usersData.justificados.find(u => u.id === userProfileId);
-                if (isConfirmado) myAsistencia = 1;
-                else if (isJustificado) myAsistencia = 2;
-            }
+            const myRecord = (ev.eventos_usuarios ?? []).find(u => u.id_usuario === userProfileId);
+            const myAsistencia = myRecord ? myRecord.asistencia : 0;
 
-            mappedEvents.push({
+            return {
                 title: ev.titulo,
                 id_evento: ev.id_evento,
                 start: ev.inicio,
@@ -86,8 +81,8 @@ export default function CalendarView() {
                     horaDisplay: horaD,
                     asistencia: myAsistencia
                 }
-            });
-        }
+            };
+        });
 
         setEvents(mappedEvents)
         setLoading(false)
@@ -95,10 +90,11 @@ export default function CalendarView() {
 
     useEffect(() => {
         fetchEvents()
-    }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId])
 
     const handleConfirmar = async () => {
-        const userProfileId = Perfil()?.getToken()?.id_usuario;
+        const userProfileId = userId;
         if (!userProfileId) return alert("Error de sesión");
 
         const { error } = await confirmarAsistencia(eventId, userProfileId);

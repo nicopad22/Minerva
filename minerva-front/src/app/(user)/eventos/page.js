@@ -10,7 +10,7 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import { MdDeleteForever, MdEdit, MdAdd, MdRecentActors } from "react-icons/md";
 import dayjs from 'dayjs';
-import Perfil from "@/app/utils/perfil";
+import { createClient } from "@/app/utils/client";
 import { getEventos, deleteEvento, getEventUsers } from "@/app/utils/supa";
 import FormEvento from "@/app/components/FormEvento";
 import EventUsersList from "@/app/components/EventUsersList";
@@ -70,7 +70,8 @@ export default function EventosPage() {
     const handleDeleteClick = async (evento) => {
         const confirmDelete = prompt(`Esta seguro que desea eliminar el evento "${evento.titulo}"?\nEscriba "Eliminar" si desea continuar`)
         if (confirmDelete === "Eliminar") {
-            const userProfileId = Perfil()?.getToken()?.id_usuario;
+            const { data: { session } } = await createClient().auth.getSession()
+            const userProfileId = session?.user?.id;
             const { error } = await deleteEvento(evento.id_evento, userProfileId);
             if (!error) {
                 alert("Evento Eliminado");

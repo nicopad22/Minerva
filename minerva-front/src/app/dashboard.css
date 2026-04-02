@@ -25,6 +25,16 @@
     font-weight: 600;
     color: #1a1a1a;
     letter-spacing: 0.03em;
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+}
+
+.dashboard_header_section {
+    font-weight: 400;
+    color: #888;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
 }
 
 .dashboard_hamburger {
@@ -201,7 +211,10 @@
 /* ── Main content ── */
 .dashboard_main {
     margin-top: 56px;
+    height: calc(100vh - 56px);
+    overflow: hidden;
     padding: 24px;
+    box-sizing: border-box;
     transition: margin-left 0.25s ease;
 }
 

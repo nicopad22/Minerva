@@ -1,10 +1,9 @@
 "use client"
-import { redirect } from 'next/navigation'
 import Perfil from './perfil'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from './client'
 import { updateProfile } from './supa'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_dbUrl, process.env.NEXT_PUBLIC_dbKey)
+const supabase = createClient()
 
 async function signInUser(user, password) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -18,7 +17,8 @@ async function signInUser(user, password) {
     return null
   } else {
     console.log('User logged in successfully:', data)
-    Perfil().setToken(data.session.access_token, data.user.id)
+    // Session is persisted automatically by Supabase in localStorage.
+    // We only store the display name manually.
     Perfil().setName(user)
     return data.user
   }

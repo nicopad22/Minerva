@@ -1,30 +1,39 @@
 'use client';
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { useRouter } from 'next/navigation';
-import Perfil from './perfil';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from './client';
+
+const supabase = createClient();
 
 export default function ClientInitializer() {
     const pathname = usePathname();
     const router = useRouter();
+    const [checked, setChecked] = useState(false);
+
     useEffect(() => {
-        const checkAuth = () => {
-            // 1. Check if the user is on the login page
+        const checkAuth = async () => {
             const isLoginPage = pathname === "/login";
+            const { data: { session } } = await supabase.auth.getSession();
 
-            // 2. Get the user status
-            const hasToken = Perfil().getToken()?.id_usuario;
-
-            if (!hasToken && !isLoginPage) {
+            if (!session && !isLoginPage) {
                 router.replace("/login");
-            }
-
-            if (hasToken && isLoginPage) {
+            } else if (session && isLoginPage) {
                 router.replace("/");
             }
+            setChecked(true);
         };
 
         checkAuth();
+
+        // Also react to auth state changes (e.g. session expiry)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            const isLoginPage = pathname === "/login";
+            if (!session && !isLoginPage) {
+                router.replace("/login");
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, [pathname, router]);
 
     return null;

@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CircularProgress, styled, TextField, Typography } from '@mui/material';
 import { MdCloudUpload, MdClose } from "react-icons/md";
-import Perfil from '../utils/perfil';
+import { createClient } from '../utils/client';
 import { green } from '@mui/material/colors';
 import { enviarJustificacion } from '../utils/supa';
 
@@ -36,7 +36,8 @@ export default function FormInasistencia({ eventId, handleClose, onSuccess }) {
   };
 
   const handleSubmit = async () => {
-    const userProfileId = Perfil()?.getToken()?.id_usuario;
+    const { data: { session } } = await createClient().auth.getSession()
+    const userProfileId = session?.user?.id;
     if (!userProfileId) {
         alert("Usuario no autenticado");
         return;

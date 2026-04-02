@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
-import Perfil from "../utils/perfil"
 import { getMyTasks } from "../utils/supa"
+import { createClient } from "../utils/client"
 import Link from "next/link"
 import CalendarView from "@/app/components/CalendarView"
 
@@ -10,10 +10,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const { id_usuario } = Perfil().getToken()
-    if (id_usuario) {
-      loadTasks(id_usuario)
-    }
+    createClient().auth.getSession().then(({ data: { session } }) => {
+      const id_usuario = session?.user?.id
+      if (id_usuario) loadTasks(id_usuario)
+    })
   }, [])
 
   async function loadTasks(userId) {

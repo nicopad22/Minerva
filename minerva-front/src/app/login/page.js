@@ -2,11 +2,14 @@
 import "@/app/login.css"
 import { Box, Button, CircularProgress, Modal, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import Perfil from "@/app/utils/perfil";
 import { green } from '@mui/material/colors';
 import { useRouter } from 'next/navigation'
 import { signInUser, changePassword } from "../utils/supaAuth";
 import { getProfileById, updateProfile } from "../utils/supa";
+import { createClient } from "../utils/client";
+import Perfil from "../utils/perfil";
+
+const supabase = createClient();
 
 const modalStyle = {
     position: 'absolute',
@@ -38,9 +41,9 @@ export default function Login() {
     const router = useRouter()
 
     useEffect(() => {
-        if (Perfil().getToken().id_usuario) {
-            router.replace("/")
-        }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) router.replace("/")
+        })
     }, [router])
 
     const handleLogin = async () => {
@@ -59,7 +62,7 @@ export default function Login() {
             setLoggedUserEmail(user.email)
             setShowSetup(true)
         } else {
-            // Returning user — store full_name and go to dashboard
+            // Returning user — store display name and go to dashboard
             Perfil().setName(profile.username)
             router.replace("/")
         }

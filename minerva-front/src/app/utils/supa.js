@@ -1,5 +1,4 @@
 import { createClient } from "./client"
-import Perfil from "./perfil"
 
 const supaClient = createClient()
 
@@ -48,10 +47,13 @@ export async function updateProfile(userId, updates) {
  * @returns {Promise<boolean>}
  */
 export async function hasPermiso(permiso) {
+    const { data: { session } } = await supaClient.auth.getSession()
+    const id_usuario = session?.user?.id
+    if (!id_usuario) return false
     const { data } = await supaClient
         .from("permisos_usuarios")
         .select("permiso")
-        .eq("id_usuario", Perfil().getToken()?.id_usuario)
+        .eq("id_usuario", id_usuario)
         .eq("permiso", permiso)
         .maybeSingle()
     return !!data
@@ -102,6 +104,20 @@ export async function deletePermisoUsuario(userId, permiso) {
 }
 
 /**
+ * Fetches profiles of all members belonging to a specific team.
+ * @param {number} teamId
+ * @returns {Promise<{profiles: object[], error: object|null}>}
+ */
+export async function getTeamMembers(teamId) {
+    const { data, error } = await supaClient
+        .from("team_members")
+        .select("user_id, role, profiles:user_id(id, full_name, username, avatar_url)")
+        .eq("team_id", teamId)
+    const profiles = (data ?? []).map(row => row.profiles).filter(Boolean)
+    return { profiles, error: error ?? null }
+}
+
+/**
  * Fetches all tasks.
  */
 export async function getAllTasks() {
@@ -120,7 +136,8 @@ export async function getAllTasks() {
  * @param {string} [email]
  */
 export async function createUser(username, password, full_name, email) {
-    const token = Perfil().getToken()?.token
+    const { data: { session } } = await supaClient.auth.getSession()
+    const token = session?.access_token
     const res = await fetch(
         `${process.env.NEXT_PUBLIC_dbUrl}/functions/v1/create-user`,
         {
@@ -415,7 +432,7 @@ export async function getTaskProgresos(taskId) {
 export async function getEventos() {
     const { data, error } = await supaClient
         .from("eventos")
-        .select("*")
+        .select("*, eventos_usuarios(asistencia, id_usuario)")
         .eq("deleted", false)
         .order("inicio", { ascending: true })
     return { eventos: data ?? [], error }

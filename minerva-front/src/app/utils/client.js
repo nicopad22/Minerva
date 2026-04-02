@@ -1,22 +1,13 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import Perfil from './perfil';
+
+// Singleton client — Supabase manages the session via localStorage automatically
+let _client = null;
 
 export function createClient() {
-    const { token } = Perfil().getToken();
-
-    const options = {}
-
-    if (token) {
-        options.global = {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        }
-    }
-
-    return createSupabaseClient(
+    if (_client) return _client;
+    _client = createSupabaseClient(
         process.env.NEXT_PUBLIC_dbUrl,
-        process.env.NEXT_PUBLIC_dbKey,
-        options
-    )
+        process.env.NEXT_PUBLIC_dbKey
+    );
+    return _client;
 }

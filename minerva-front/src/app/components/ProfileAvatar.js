@@ -1,16 +1,21 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
 import { MdAdd, MdCameraAlt } from "react-icons/md"
-import Perfil from "../utils/perfil"
 import { getProfileById, uploadAvatar as uploadAvatarSupa } from "../utils/supa"
+import { createClient } from "../utils/client"
 import Image from "next/image"
 
 export default function ProfileAvatar({ size = 40 }) {
     const [avatarUrl, setAvatarUrl] = useState(null)
     const [uploading, setUploading] = useState(false)
+    const [id_usuario, setIdUsuario] = useState(null)
     const fileInputRef = useRef(null)
-    const { id_usuario } = Perfil().getToken()
+
+    useEffect(() => {
+        createClient().auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.id) setIdUsuario(session.user.id)
+        })
+    }, [])
 
     useEffect(() => {
         if (id_usuario) {

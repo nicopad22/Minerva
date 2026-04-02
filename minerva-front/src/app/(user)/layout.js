@@ -8,6 +8,13 @@ import { signOutUser } from "../utils/supaAuth"
 import { hasPermiso } from "../utils/supa"
 import "@/app/dashboard.css"
 
+const PAGE_LABELS = {
+  "/": null,
+  "/tareas": "Tareas",
+  "/usuarios": "Usuarios",
+  "/eventos": "Eventos",
+}
+
 export default function UserLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [navItems, setNavItems] = useState([
@@ -63,7 +70,9 @@ export default function UserLayout({ children }) {
           >
             ☰
           </button>
-          <span className="dashboard_header_title">Minerva</span>
+          <span className="dashboard_header_title">
+            Minerva{PAGE_LABELS[pathname] ? <span className="dashboard_header_section"> · {PAGE_LABELS[pathname]}</span> : null}
+          </span>
         </div>
         <div className="dashboard_header_right">
           <UserProfilePopup onSignOut={handleSignOut} />
